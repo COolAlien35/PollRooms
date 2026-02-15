@@ -1,4 +1,4 @@
-// app/p/[slug]/page.tsx — Poll Room: Select → Submit Flow + Timer + Multi-Select
+// app/p/[slug]/page.tsx — Poll Room: Phase 7 — QR, Golden Winner, Sound
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
@@ -7,8 +7,10 @@ import io, { Socket } from 'socket.io-client';
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import { toast } from 'sonner';
-import { Share2, Copy, Check, ArrowLeft, Sparkles, Clock, CheckSquare } from 'lucide-react';
+import { Share2, Copy, Check, ArrowLeft, Sparkles, Clock, CheckSquare, Trophy, QrCode, X, Volume2, VolumeX } from 'lucide-react';
 import { getDeviceFingerprint } from '@/lib/fingerprint';
+import QRCode from 'react-qr-code';
+import useSound from 'use-sound';
 
 // ─── Types ───────────────────────────────────────────────
 interface Option { id: string; text: string; vote_count: number; display_order: number; }
@@ -17,11 +19,27 @@ interface Poll {
     resultsHidden?: boolean; expiresAt?: string | null; allowMultiple?: boolean; isActive?: boolean;
 }
 
+// ─── Winner Utility ──────────────────────────────────────
+function getWinner(options: Option[]): Option | null {
+    if (options.length === 0) return null;
+    const maxVotes = Math.max(...options.map((o) => o.vote_count));
+    if (maxVotes === 0) return null;
+    const top = options.filter((o) => o.vote_count === maxVotes);
+    return top.length === 1 ? top[0] : null; // null if tie
+}
+
 // ─── Confetti ────────────────────────────────────────────
 function fireConfetti() {
     const colors = ['#10b981', '#34d399', '#6ee7b7', '#fbbf24', '#f472b6'];
     confetti({ particleCount: 60, spread: 70, origin: { y: 0.65 }, colors, ticks: 80, gravity: 0.9 });
     setTimeout(() => confetti({ particleCount: 40, spread: 100, origin: { y: 0.6, x: 0.6 }, colors, ticks: 70 }), 150);
+}
+
+function fireWinnerConfetti() {
+    const gold = ['#eab308', '#fbbf24', '#fde68a', '#f59e0b', '#10b981'];
+    confetti({ particleCount: 100, spread: 90, origin: { y: 0.5 }, colors: gold, ticks: 120, gravity: 0.8, scalar: 1.2 });
+    setTimeout(() => confetti({ particleCount: 60, spread: 120, origin: { y: 0.55, x: 0.3 }, colors: gold, ticks: 100 }), 200);
+    setTimeout(() => confetti({ particleCount: 60, spread: 120, origin: { y: 0.55, x: 0.7 }, colors: gold, ticks: 100 }), 400);
 }
 
 // ─── Component ───────────────────────────────────────────
@@ -41,9 +59,16 @@ export default function PollPage() {
     const [rateLimitCountdown, setRateLimitCountdown] = useState(0);
     const [canNativeShare, setCanNativeShare] = useState(false);
     const [timeLeft, setTimeLeft] = useState<number | null>(null);
+    const [showQR, setShowQR] = useState(false);
+    const [soundEnabled, setSoundEnabled] = useState(true);
 
     const socketRef = useRef<Socket | null>(null);
     const fingerprintRef = useRef<string | null>(null);
+    const wasExpiredRef = useRef(false); // track if poll was already expired on load
+
+    // ─── Sounds (graceful fallback) ─────────────────────────
+    const [playClick] = useSound('/sounds/click.wav', { volume: 0.3, soundEnabled });
+    const [playSuccess] = useSound('/sounds/success.wav', { volume: 0.5, soundEnabled });
 
     // ─── Mount ─────────────────────────────────────────────
     useEffect(() => {
@@ -74,36 +99,64 @@ export default function PollPage() {
 
     const isExpired = timeLeft !== null && timeLeft <= 0;
 
-    // ─── Fetch poll ────────────────────────────────────────
+    // ─── Fire winner confetti when poll expires live ───────
     useEffect(() => {
+        if (isExpired && !wasExpiredRef.current && poll) {
+            wasExpiredRef.current = true;
+            const winner = getWinner(poll.options);
+            if (winner) {
+                fireWinnerConfetti();
+                toast('🏆 Poll closed!', { description: `Winner: ${winner.text}` });
+            }
+        }
+    }, [isExpired, poll]);
+
+    // ─── Refetch utility (reusable for initial load + reconnect sync) ──
+    const refetchPoll = useCallback(async () => {
         if (!slug) return;
-        (async () => {
-            try {
-                const res = await fetch(`/api/polls/${slug}`);
-                if (!res.ok) { setError(res.status === 404 ? 'Poll not found' : 'Failed to load'); setLoading(false); return; }
-                const data = await res.json();
-                setPoll(data);
-                setLoading(false);
-                if (localStorage.getItem(`voted_${data.id}`)) {
-                    setHasVoted(true);
-                    const stored = localStorage.getItem(`voted_options_${data.id}`);
-                    if (stored) {
-                        try { setVotedOptionIds(JSON.parse(stored)); } catch { /* ignore */ }
-                    }
+        try {
+            const res = await fetch(`/api/polls/${slug}`);
+            if (!res.ok) { setError(res.status === 404 ? 'Poll not found' : 'Failed to load'); setLoading(false); return; }
+            const data = await res.json();
+            setPoll(data);
+            setLoading(false);
+            // Check if already expired on load
+            if (data.expiresAt && new Date(data.expiresAt).getTime() <= Date.now()) {
+                wasExpiredRef.current = true;
+            }
+            if (localStorage.getItem(`voted_${data.id}`)) {
+                setHasVoted(true);
+                const stored = localStorage.getItem(`voted_options_${data.id}`);
+                if (stored) {
+                    try { setVotedOptionIds(JSON.parse(stored)); } catch { /* ignore */ }
                 }
-            } catch (err) { console.error(err); setError('Connection failed'); setLoading(false); }
-        })();
+            }
+        } catch (err) { console.error(err); setError('Connection failed'); setLoading(false); }
     }, [slug]);
 
-    // ─── Socket ────────────────────────────────────────────
+    // ─── Fetch poll (initial load) ──────────────────────────
+    useEffect(() => {
+        refetchPoll();
+    }, [refetchPoll]);
+
+    // ─── Socket (with zombie-socket resync on reconnect) ───
     useEffect(() => {
         if (!poll) return;
         const url = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:3001';
         const socket = io(url, { transports: ['websocket', 'polling'], reconnection: true, reconnectionAttempts: 10, reconnectionDelay: 1000, reconnectionDelayMax: 5000 });
         socketRef.current = socket;
-        socket.on('connect', () => { setSocketConnected(true); socket.emit('join_poll', poll.id); });
+        socket.on('connect', () => {
+            setSocketConnected(true);
+            socket.emit('join_poll', poll.id);
+            // Resync from DB to catch any votes missed while disconnected
+            refetchPoll();
+        });
         socket.on('disconnect', () => setSocketConnected(false));
-        socket.on('reconnect', () => socket.emit('join_poll', poll.id));
+        socket.on('reconnect', () => {
+            socket.emit('join_poll', poll.id);
+            // Resync: fetch latest state after any offline gap
+            refetchPoll();
+        });
         socket.on('vote_update', (d: { optionId: string; newCount: number }) => {
             setPoll((p) => {
                 if (!p) return p;
@@ -112,11 +165,12 @@ export default function PollPage() {
             });
         });
         return () => { socket.emit('leave_poll', poll.id); socket.disconnect(); };
-    }, [poll?.id]);
+    }, [poll?.id, refetchPoll]);
 
     // ─── Toggle selection ──────────────────────────────────
     const toggleOption = useCallback((optionId: string) => {
         if (hasVoted || voting || rateLimitCountdown > 0 || isExpired) return;
+        playClick();
         setSelectedOptions((prev) => {
             if (poll?.allowMultiple) {
                 return prev.includes(optionId)
@@ -126,7 +180,7 @@ export default function PollPage() {
             // Single mode: replace
             return prev[0] === optionId ? [] : [optionId];
         });
-    }, [hasVoted, voting, rateLimitCountdown, isExpired, poll?.allowMultiple]);
+    }, [hasVoted, voting, rateLimitCountdown, isExpired, poll?.allowMultiple, playClick]);
 
     // ─── Submit ballot ────────────────────────────────────
     const handleSubmit = useCallback(async () => {
@@ -167,6 +221,7 @@ export default function PollPage() {
                         return { ...p, options: opts, totalVotes: opts.reduce((s, o) => s + o.vote_count, 0) };
                     });
                 }
+                playSuccess();
                 fireConfetti();
                 toast.success('Vote recorded!', { description: 'Results update live.' });
             } else {
@@ -182,20 +237,46 @@ export default function PollPage() {
         } finally {
             setVoting(false);
         }
-    }, [poll, hasVoted, voting, selectedOptions, slug, rateLimitCountdown, isExpired]);
+    }, [poll, hasVoted, voting, selectedOptions, slug, rateLimitCountdown, isExpired, playSuccess]);
 
-    // ─── Share ─────────────────────────────────────────────
+    // ─── Share (robust clipboard with textarea fallback) ───
     const handleShare = async () => {
         const url = window.location.href;
+
+        // 1. Native Share API (mobile)
         if (navigator.share) {
             try { await navigator.share({ title: poll?.question || 'Poll', url }); return; }
             catch (e) { if ((e as Error).name === 'AbortError') return; }
         }
-        try { await navigator.clipboard.writeText(url); }
-        catch { const i = document.createElement('input'); i.value = url; document.body.appendChild(i); i.select(); document.execCommand('copy'); document.body.removeChild(i); }
-        setCopied(true);
-        toast.success('Link copied!');
-        setTimeout(() => setCopied(false), 2000);
+
+        // 2. Modern Clipboard API (may fail on HTTP / Mobile Safari / WebViews)
+        let didCopy = false;
+        if (navigator.clipboard?.writeText) {
+            try {
+                await navigator.clipboard.writeText(url);
+                didCopy = true;
+            } catch { /* falls through to textarea fallback */ }
+        }
+
+        // 3. Textarea fallback (works everywhere, even http://localhost)
+        if (!didCopy) {
+            const ta = document.createElement('textarea');
+            ta.value = url;
+            ta.setAttribute('readonly', '');
+            ta.style.cssText = 'position:fixed;left:-9999px;top:-9999px;opacity:0';
+            document.body.appendChild(ta);
+            ta.select();
+            try { document.execCommand('copy'); didCopy = true; } catch { /* last resort failed */ }
+            document.body.removeChild(ta);
+        }
+
+        if (didCopy) {
+            setCopied(true);
+            toast.success('Link copied!');
+            setTimeout(() => setCopied(false), 2000);
+        } else {
+            toast.error('Could not copy link. Try manually.');
+        }
     };
 
     // ─── Loading ───────────────────────────────────────────
@@ -226,8 +307,9 @@ export default function PollPage() {
     const totalVotes = poll.options.reduce((s, o) => s + o.vote_count, 0);
     const showResults = hasVoted || !poll.resultsHidden;
     const maxVotes = Math.max(...poll.options.map((o) => o.vote_count), 1);
-    const leaderId = poll.options.reduce((best, o) => o.vote_count > best.vote_count ? o : best, poll.options[0])?.id;
-    const hasClearWinner = totalVotes >= 3 && poll.options.filter((o) => o.vote_count === maxVotes).length === 1;
+    const winner = getWinner(poll.options);
+    const hasClearWinner = totalVotes >= 3 && winner !== null;
+    const isGoldenWinner = isExpired && hasClearWinner; // Gold treatment only when poll is closed
     const canVote = !hasVoted && !isExpired && rateLimitCountdown <= 0;
 
     return (
@@ -239,13 +321,21 @@ export default function PollPage() {
                     <span>New Poll</span>
                 </a>
                 <div className="flex items-center gap-3">
+                    {/* Sound toggle */}
+                    <button
+                        onClick={() => setSoundEnabled(!soundEnabled)}
+                        className="p-1.5 rounded-lg text-neutral-600 hover:text-neutral-400 hover:bg-neutral-800/50 transition-colors"
+                        title={soundEnabled ? 'Mute sounds' : 'Enable sounds'}
+                    >
+                        {soundEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+                    </button>
                     {/* Timer badge */}
                     {timeLeft !== null && (
                         <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-mono font-bold ${isExpired
-                                ? 'bg-red-500/10 border border-red-500/20 text-red-400'
-                                : timeLeft <= 60
-                                    ? 'bg-amber-500/10 border border-amber-500/20 text-amber-400'
-                                    : 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400'
+                            ? 'bg-red-500/10 border border-red-500/20 text-red-400'
+                            : timeLeft <= 60
+                                ? 'bg-amber-500/10 border border-amber-500/20 text-amber-400'
+                                : 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400'
                             }`}>
                             <Clock className="h-3 w-3" />
                             {isExpired ? 'Expired' : fmtTimer(timeLeft)}
@@ -293,6 +383,26 @@ export default function PollPage() {
                     </div>
                 </motion.div>
 
+                {/* ── Golden Winner Banner ── */}
+                <AnimatePresence>
+                    {isGoldenWinner && winner && (
+                        <motion.div
+                            initial={{ opacity: 0, y: -8, scale: 0.95 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="mb-4 rounded-xl border border-yellow-500/30 bg-yellow-500/5 p-4 text-center shadow-[0_0_30px_rgba(234,179,8,0.15)]"
+                        >
+                            <div className="flex items-center justify-center gap-2">
+                                <Trophy className="h-5 w-5 text-yellow-500" />
+                                <span className="text-sm font-bold text-yellow-400">Winner</span>
+                                <Trophy className="h-5 w-5 text-yellow-500" />
+                            </div>
+                            <p className="mt-1 text-lg font-bold text-yellow-300">{winner.text}</p>
+                            <p className="mt-0.5 text-xs text-yellow-500/60">{winner.vote_count} votes · {totalVotes > 0 ? Math.round((winner.vote_count / totalVotes) * 100) : 0}%</p>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+
                 {/* ── Options (select, don't vote) ── */}
                 <div className="space-y-3">
                     {poll.options
@@ -302,7 +412,9 @@ export default function PollPage() {
                             const barPct = showResults && totalVotes > 0 ? (option.vote_count / maxVotes) * 100 : 0;
                             const isSelected = selectedOptions.includes(option.id);
                             const isMyVote = votedOptionIds.includes(option.id);
-                            const isWinner = showResults && hasClearWinner && option.id === leaderId;
+                            const isThisWinner = winner?.id === option.id;
+                            const isGold = isGoldenWinner && isThisWinner;
+                            const isLeader = showResults && hasClearWinner && isThisWinner;
                             const isDisabled = !canVote || voting;
 
                             return (
@@ -314,13 +426,15 @@ export default function PollPage() {
                                     onClick={() => toggleOption(option.id)}
                                     disabled={isDisabled && !hasVoted}
                                     className={`group relative w-full text-left rounded-xl p-5 transition-all
-                    ${isMyVote
-                                            ? 'glass-panel-strong ring-1 ring-emerald-500/50'
-                                            : isSelected
-                                                ? 'glass-panel-strong ring-1 ring-emerald-500/40 bg-emerald-500/5'
-                                                : isWinner
-                                                    ? 'glass-panel winner-glow'
-                                                    : 'glass-panel'
+                    ${isGold
+                                            ? 'glass-panel-strong border-yellow-500/50 shadow-[0_0_30px_rgba(234,179,8,0.3)] ring-1 ring-yellow-500/30'
+                                            : isMyVote
+                                                ? 'glass-panel-strong ring-1 ring-emerald-500/50'
+                                                : isSelected
+                                                    ? 'glass-panel-strong ring-1 ring-emerald-500/40 bg-emerald-500/5'
+                                                    : isLeader
+                                                        ? 'glass-panel winner-glow'
+                                                        : 'glass-panel'
                                         }
                     ${canVote && !voting
                                             ? 'hover:bg-neutral-800/60 cursor-pointer active:scale-[0.99]'
@@ -334,7 +448,12 @@ export default function PollPage() {
                                     {showResults && (
                                         <div className="absolute inset-x-3 bottom-2 h-1.5 vote-bar-track">
                                             <motion.div
-                                                className={`h-full vote-bar-fill vote-bar-stripes ${isMyVote || isWinner ? 'vote-bar-fill-winner' : ''}`}
+                                                className={`h-full vote-bar-fill vote-bar-stripes ${isGold
+                                                    ? 'vote-bar-fill-gold'
+                                                    : isMyVote || isLeader
+                                                        ? 'vote-bar-fill-winner'
+                                                        : ''
+                                                    }`}
                                                 initial={{ width: '0%' }}
                                                 animate={{ width: `${barPct}%` }}
                                                 transition={{ type: 'spring', stiffness: 100, damping: 20, mass: 0.8 }}
@@ -348,8 +467,8 @@ export default function PollPage() {
                                             {/* Selection indicator (before voting) */}
                                             {!hasVoted && (
                                                 <span className={`flex-shrink-0 h-5 w-5 rounded-md border-2 flex items-center justify-center transition-all ${isSelected
-                                                        ? 'border-emerald-500 bg-emerald-500'
-                                                        : 'border-neutral-600'
+                                                    ? 'border-emerald-500 bg-emerald-500'
+                                                    : 'border-neutral-600'
                                                     }`}>
                                                     {isSelected && <Check className="h-3 w-3 text-white" />}
                                                 </span>
@@ -365,8 +484,20 @@ export default function PollPage() {
                                                     <Check className="h-5 w-5 text-emerald-400" />
                                                 </motion.span>
                                             )}
-                                            {isWinner && !isMyVote && hasVoted && <span className="text-sm">🏆</span>}
-                                            <span className={`text-base font-medium ${isMyVote ? 'text-emerald-300'
+                                            {/* Trophy for golden winner */}
+                                            {isGold && (
+                                                <motion.span
+                                                    initial={{ scale: 0, rotate: -20 }}
+                                                    animate={{ scale: 1, rotate: 0 }}
+                                                    transition={{ type: 'spring', stiffness: 200 }}
+                                                >
+                                                    <Trophy className="h-5 w-5 text-yellow-500" />
+                                                </motion.span>
+                                            )}
+                                            {/* Regular leader indicator */}
+                                            {isLeader && !isGold && !isMyVote && hasVoted && <span className="text-sm">🏆</span>}
+                                            <span className={`text-base font-medium ${isGold ? 'text-yellow-300'
+                                                : isMyVote ? 'text-emerald-300'
                                                     : isSelected ? 'text-emerald-200'
                                                         : 'text-gray-200'
                                                 }`}>
@@ -380,7 +511,7 @@ export default function PollPage() {
                                                 transition={{ delay: 0.3 }}
                                                 className="flex items-center gap-2 text-sm"
                                             >
-                                                <span className={`font-bold tabular-nums ${isWinner ? 'text-emerald-400' : 'text-gray-200'}`}>
+                                                <span className={`font-bold tabular-nums ${isGold ? 'text-yellow-400' : isLeader ? 'text-emerald-400' : 'text-gray-200'}`}>
                                                     {option.vote_count}
                                                 </span>
                                                 <span className="text-neutral-600 tabular-nums text-xs">{pct}%</span>
@@ -457,21 +588,78 @@ export default function PollPage() {
 
                 {/* ── Share ── */}
                 <div className="mt-8 flex flex-col items-center gap-3">
-                    <button
-                        onClick={handleShare}
-                        className="inline-flex items-center gap-2 rounded-xl border border-neutral-800 bg-transparent px-6 py-3 text-sm font-medium text-neutral-400 hover:border-emerald-500/30 hover:text-emerald-400 transition-all active:scale-[0.98]"
-                    >
-                        {copied ? (
-                            <><Check className="h-4 w-4 text-emerald-400" /> Copied!</>
-                        ) : (
-                            <>{canNativeShare ? <Share2 className="h-4 w-4" /> : <Copy className="h-4 w-4" />} Share Poll</>
-                        )}
-                    </button>
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={handleShare}
+                            className="inline-flex items-center gap-2 rounded-xl bg-white/10 backdrop-blur-sm px-6 py-3 text-sm font-medium text-gray-200 hover:bg-white/20 transition-all active:scale-[0.98] border border-white/10"
+                        >
+                            {copied ? (
+                                <><Check className="h-4 w-4 text-emerald-400" /> Copied!</>
+                            ) : (
+                                <>{canNativeShare ? <Share2 className="h-4 w-4" /> : <Copy className="h-4 w-4" />} Share Poll</>
+                            )}
+                        </button>
+                        <button
+                            onClick={() => setShowQR(true)}
+                            className="inline-flex items-center gap-2 rounded-xl bg-white/10 backdrop-blur-sm px-4 py-3 text-sm font-medium text-gray-200 hover:bg-white/20 transition-all active:scale-[0.98] border border-white/10"
+                            title="Show QR Code"
+                        >
+                            <QrCode className="h-4 w-4" />
+                            <span className="hidden sm:inline">QR Code</span>
+                        </button>
+                    </div>
                     <a href="/" className="text-xs text-neutral-600 hover:text-emerald-400 transition-colors">
                         ← Create another poll
                     </a>
                 </div>
             </main>
+
+            {/* ── QR Code Modal ── */}
+            <AnimatePresence>
+                {showQR && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+                        onClick={() => setShowQR(false)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.85, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.85, opacity: 0 }}
+                            transition={{ type: 'spring', stiffness: 300, damping: 25 }}
+                            className="glass-panel-strong p-8 rounded-2xl max-w-sm w-full text-center"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <div className="flex items-center justify-between mb-6">
+                                <h3 className="text-lg font-bold text-gray-100">Scan to Join</h3>
+                                <button
+                                    onClick={() => setShowQR(false)}
+                                    className="p-1.5 rounded-lg text-neutral-500 hover:text-gray-200 hover:bg-neutral-800 transition-colors"
+                                >
+                                    <X className="h-5 w-5" />
+                                </button>
+                            </div>
+                            <div className="bg-white rounded-xl p-4 mx-auto w-fit">
+                                <QRCode
+                                    value={typeof window !== 'undefined' ? window.location.href : ''}
+                                    size={220}
+                                    level="H"
+                                    fgColor="#0a0a0a"
+                                    bgColor="#ffffff"
+                                />
+                            </div>
+                            <p className="mt-4 text-sm text-neutral-400">
+                                Point your camera at this code to open the poll
+                            </p>
+                            <p className="mt-1 text-xs text-neutral-600 font-mono break-all">
+                                {typeof window !== 'undefined' ? window.location.href : ''}
+                            </p>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }

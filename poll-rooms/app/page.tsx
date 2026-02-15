@@ -1,22 +1,22 @@
-// app/page.tsx — Homepage: Grid & Emerald + Phase 6 Settings
+// app/page.tsx — Homepage: Grid & Emerald + Phase 6.5 Scheduler Update
 'use client';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
-import { Plus, X, Sparkles, Zap, Shield, Eye, Clock, CheckSquare } from 'lucide-react';
+import { Plus, X, Sparkles, Zap, Shield, Eye, Clock, CheckSquare, CalendarClock } from 'lucide-react';
+import DatePicker from 'react-datepicker';
 
 const MAX_OPTIONS = 10;
 const MIN_OPTIONS = 2;
 
 const DURATION_OPTIONS = [
-  { label: 'No Limit', value: 0 },
-  { label: '1 minute', value: 1 },
-  { label: '5 minutes', value: 5 },
-  { label: '15 minutes', value: 15 },
-  { label: '30 minutes', value: 30 },
-  { label: '1 hour', value: 60 },
+  { label: 'No Limit', value: '0' },
+  { label: '10 Minutes', value: '10' },
+  { label: '1 Hour', value: '60' },
+  { label: '24 Hours', value: '1440' },
+  { label: 'Custom Date…', value: 'custom' },
 ];
 
 export default function HomePage() {
@@ -24,7 +24,8 @@ export default function HomePage() {
   const [question, setQuestion] = useState('');
   const [options, setOptions] = useState(['', '']);
   const [resultsHidden, setResultsHidden] = useState(false);
-  const [durationMinutes, setDurationMinutes] = useState(0);
+  const [durationValue, setDurationValue] = useState('0');
+  const [customExpiresAt, setCustomExpiresAt] = useState<Date | null>(null);
   const [allowMultiple, setAllowMultiple] = useState(false);
   const [creating, setCreating] = useState(false);
 
@@ -48,18 +49,33 @@ export default function HomePage() {
     if (valid.length < MIN_OPTIONS) { toast.error(`Need at least ${MIN_OPTIONS} options`); return; }
     if (new Set(valid.map((o) => o.toLowerCase())).size !== valid.length) { toast.error('Remove duplicate options'); return; }
 
+    // ── Custom-date client-side check ──
+    if (durationValue === 'custom') {
+      if (!customExpiresAt) { toast.error('Please pick an end date'); return; }
+      if (customExpiresAt.getTime() <= Date.now()) {
+        toast.error('End date must be in the future'); return;
+      }
+    }
+
     setCreating(true);
     try {
+      const payload: Record<string, unknown> = {
+        question: q,
+        options: valid,
+        resultsHidden,
+        allowMultiple,
+      };
+
+      if (durationValue === 'custom') {
+        payload.expiresAt = customExpiresAt!.toISOString();
+      } else if (Number(durationValue) > 0) {
+        payload.durationMinutes = Number(durationValue);
+      }
+
       const res = await fetch('/api/polls/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          question: q,
-          options: valid,
-          resultsHidden,
-          durationMinutes: durationMinutes > 0 ? durationMinutes : undefined,
-          allowMultiple,
-        }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (!res.ok) { toast.error(data.error || 'Creation failed'); setCreating(false); return; }
@@ -174,27 +190,71 @@ export default function HomePage() {
           <div className="space-y-3">
             <h3 className="text-sm font-semibold text-gray-300">Settings</h3>
 
-            {/* Timer */}
-            <div className="glass-panel p-4">
+            {/* Poll Duration */}
+            <div className="glass-panel p-4 space-y-3">
               <label htmlFor="duration" className="flex items-center justify-between">
                 <div>
                   <span className="text-sm font-semibold text-gray-200 flex items-center gap-1.5">
                     <Clock className="h-4 w-4 text-emerald-400" />
-                    Timer
+                    Poll Duration
                   </span>
                   <p className="text-xs text-neutral-500 mt-0.5">Auto-close after duration</p>
                 </div>
                 <select
                   id="duration"
-                  value={durationMinutes}
-                  onChange={(e) => setDurationMinutes(Number(e.target.value))}
-                  className="grid-input px-3 py-1.5 text-sm rounded-lg min-w-[130px] text-right cursor-pointer"
+                  value={durationValue}
+                  onChange={(e) => {
+                    setDurationValue(e.target.value);
+                    if (e.target.value !== 'custom') setCustomExpiresAt(null);
+                  }}
+                  className="grid-input px-3 py-1.5 text-sm rounded-lg min-w-[150px] text-right cursor-pointer"
                 >
                   {DURATION_OPTIONS.map((d) => (
                     <option key={d.value} value={d.value}>{d.label}</option>
                   ))}
                 </select>
               </label>
+
+              {/* Calendar picker — revealed when "Custom Date…" is selected */}
+              <AnimatePresence>
+                {durationValue === 'custom' && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="overflow-hidden"
+                  >
+                    <label className="flex items-center gap-2 text-xs text-neutral-400 mb-1.5">
+                      <CalendarClock className="h-3.5 w-3.5" />
+                      Pick end date & time
+                    </label>
+                    <DatePicker
+                      selected={customExpiresAt}
+                      onChange={(date: Date | null) => setCustomExpiresAt(date)}
+                      showTimeSelect
+                      timeIntervals={15}
+                      dateFormat="MMMM d, yyyy h:mm aa"
+                      placeholderText="Select closing date..."
+                      minDate={new Date()}
+                      filterTime={(time) => {
+                        const now = new Date();
+                        const selected = customExpiresAt || new Date();
+                        const isToday =
+                          selected.getFullYear() === now.getFullYear() &&
+                          selected.getMonth() === now.getMonth() &&
+                          selected.getDate() === now.getDate();
+                        if (!isToday) return true;
+                        // Compare only hours + minutes
+                        const slotMins = time.getHours() * 60 + time.getMinutes();
+                        const nowMins = now.getHours() * 60 + now.getMinutes();
+                        return slotMins > nowMins;
+                      }}
+                      className="emerald-datepicker-input"
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
             {/* Multiple Choice */}

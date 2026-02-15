@@ -19,8 +19,18 @@ export async function POST(
     { params }: { params: Promise<{ slug: string }> }
 ) {
     try {
-        const body: VoteRequest = await request.json();
+        const body = await request.json();
         const { slug } = await params;
+
+        // ─── DEFENSE: Normalize optionIds to array ("Array Attack" patch) ─
+        // A malicious client could send optionIds as a string instead of an array,
+        // which would crash any .map() / .filter() call downstream.
+        const rawIds = body.optionIds;
+        const normalizedIds: string[] = Array.isArray(rawIds)
+            ? rawIds.filter((id: unknown) => typeof id === 'string' && id.length > 0)
+            : (typeof rawIds === 'string' && rawIds.length > 0 ? [rawIds] : []);
+        body.optionIds = normalizedIds;
+        body.fingerprint = typeof body.fingerprint === 'string' ? body.fingerprint : '';
 
         // ─── Get client IP ──────────────────────────────────
         const headersList = await headers();
@@ -44,7 +54,7 @@ export async function POST(
         }
 
         // Deduplicate
-        const uniqueOptionIds = [...new Set(body.optionIds)];
+        const uniqueOptionIds: string[] = [...new Set(body.optionIds as string[])];
 
         // ─── Fetch poll with settings ───────────────────────
         const { data: poll, error: pollError } = await supabase
@@ -67,12 +77,19 @@ export async function POST(
             );
         }
 
-        // ─── Expiration check ───────────────────────────────
-        if (poll.expires_at && new Date() > new Date(poll.expires_at)) {
-            return NextResponse.json(
-                { error: 'This poll has expired' },
-                { status: 403 }
-            );
+        // ─── Expiration check (SERVER-SIDE UTC — "Time Traveler" patch) ─
+        // Always use server time (new Date()) — never trust the client clock.
+        // This ensures a user with a wrong laptop clock can't vote on expired
+        // polls or get blocked when the poll is still open.
+        if (poll.expires_at) {
+            const serverNow = new Date();
+            const expiresAt = new Date(poll.expires_at);
+            if (serverNow > expiresAt) {
+                return NextResponse.json(
+                    { error: 'This poll has expired' },
+                    { status: 403 }
+                );
+            }
         }
 
         // ─── Multi-select guard ─────────────────────────────

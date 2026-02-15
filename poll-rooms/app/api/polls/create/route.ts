@@ -11,6 +11,7 @@ interface CreatePollRequest {
     resultsHidden?: boolean;
     durationMinutes?: number;
     allowMultiple?: boolean;
+    expiresAt?: string; // ISO date string for custom end date
 }
 
 export async function POST(request: NextRequest) {
@@ -65,13 +66,30 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // ─── Compute expires_at from durationMinutes ────────
+        // ─── Compute expires_at (priority: expiresAt > durationMinutes > null) ──
         let expiresAt: string | null = null;
-        if (body.durationMinutes && body.durationMinutes > 0) {
-            const allowedDurations = [1, 5, 15, 30, 60];
+
+        if (body.expiresAt) {
+            // Custom end date provided — validate it
+            const parsed = new Date(body.expiresAt);
+            if (isNaN(parsed.getTime())) {
+                return NextResponse.json(
+                    { error: 'Invalid date format for expiresAt.' },
+                    { status: 400 }
+                );
+            }
+            if (parsed.getTime() <= Date.now()) {
+                return NextResponse.json(
+                    { error: 'End date must be in the future.' },
+                    { status: 400 }
+                );
+            }
+            expiresAt = parsed.toISOString();
+        } else if (body.durationMinutes && body.durationMinutes > 0) {
+            const allowedDurations = [10, 60, 1440];
             if (!allowedDurations.includes(body.durationMinutes)) {
                 return NextResponse.json(
-                    { error: 'Invalid duration. Allowed: 1, 5, 15, 30, 60 minutes.' },
+                    { error: 'Invalid duration. Allowed: 10, 60, 1440 minutes.' },
                     { status: 400 }
                 );
             }
