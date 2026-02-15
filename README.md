@@ -43,14 +43,14 @@
 <table width="100%">
   <tr>
     <td width="50%" align="center">
-      <img src="./poll-rooms/screenshots/home-hero.png" alt="Home — Create a Poll" width="100%"/>
+      <img src="./screenshots/home-hero.png" alt="Home — Create a Poll" width="100%"/>
       <br/>
       <sub><strong>🏠 Home — Create a Poll</strong></sub>
       <br/>
       <sub>Glassmorphism form on a cyber-organic grid. Dynamic option inputs, smart scheduling presets, and a pulsing "LIVE VOTING" beacon.</sub>
     </td>
     <td width="50%" align="center">
-      <img src="./poll-rooms/screenshots/live-voting.jpg" alt="Live Voting — Blind Mode" width="100%"/>
+      <img src="./screenshots/live-voting.jpg" alt="Live Voting — Blind Mode" width="100%"/>
       <br/>
       <sub><strong>⚡ Live Voting — Blind Mode</strong></sub>
       <br/>
@@ -59,14 +59,14 @@
   </tr>
   <tr>
     <td width="50%" align="center">
-      <img src="./poll-rooms/screenshots/create-poll.png" alt="Settings — Calendar & Toggles" width="100%"/>
+      <img src="./screenshots/calendar-scheduler.png" alt="Smart Scheduling — Custom Date & Time Picker" width="100%"/>
       <br/>
-      <sub><strong>📅 Settings — Calendar & Toggles</strong></sub>
+      <sub><strong>📅 Smart Scheduling — Custom Date & Time</strong></sub>
       <br/>
-      <sub>1-Hour duration preset, Multiple Choice toggle ON, Blind Voting toggle ON — all powered by <code>react-datepicker</code> with dark emerald theming.</sub>
+      <sub>Dark-themed <code>react-datepicker</code> with emerald accents — full calendar + scrollable time slots. "Custom Date…" mode with Multi-Select & Blind Voting toggles.</sub>
     </td>
     <td width="50%" align="center">
-      <img src="./poll-rooms/screenshots/winner-confetti.png" alt="Golden Winner — Confetti" width="100%"/>
+      <img src="./screenshots/winner-confetti.png" alt="Golden Winner — Confetti" width="100%"/>
       <br/>
       <sub><strong>🏆 Golden Winner — Confetti</strong></sub>
       <br/>
@@ -78,7 +78,7 @@
 <br/>
 
 <p align="center">
-  <img src="./poll-rooms/screenshots/qr-code.png" alt="QR Code — Scan to Join" width="360"/>
+  <img src="./screenshots/qr-code.png" alt="QR Code — Scan to Join" width="360"/>
   <br/>
   <sub><strong>📱 QR Code Modal — "Scan to Join"</strong></sub>
   <br/>
