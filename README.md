@@ -10,7 +10,7 @@
   <a href="https://socket.io/"><img src="https://img.shields.io/badge/Socket.io-010101?style=flat-square&logo=socket.io&logoColor=white" alt="Socket.io"/></a>
   <a href="https://supabase.com/"><img src="https://img.shields.io/badge/Supabase-3FCF8E?style=flat-square&logo=supabase&logoColor=white" alt="Supabase"/></a>
   <a href="https://vercel.com/"><img src="https://img.shields.io/badge/Vercel-000000?style=flat-square&logo=vercel&logoColor=white" alt="Vercel"/></a>
-  <a href="https://railway.app/"><img src="https://img.shields.io/badge/Railway-0B0D0E?style=flat-square&logo=railway&logoColor=white" alt="Railway"/></a>
+  <a href="https://render.com/"><img src="https://img.shields.io/badge/Render-46E3B7?style=flat-square&logo=render&logoColor=white" alt="Render"/></a>
   <img src="https://img.shields.io/badge/Status-Production-10b981?style=flat-square" alt="Status"/>
   <img src="https://img.shields.io/badge/License-MIT-f5f5f5?style=flat-square" alt="License"/>
 </p>
@@ -33,7 +33,7 @@
 </p>
 
 <p align="center">
-  <sub><em>☝️ Paste your Vercel deployment URL above to activate this button</em></sub>
+  <sub><em>🌐 Live at <strong>poll-rooms.vercel.app</strong> — Frontend on Vercel Edge · Socket Server on Render · Database on Supabase</em></sub>
 </p>
 
 ---
@@ -89,7 +89,7 @@
 
 ## 🏗️ System Architecture
 
-> **Split-Stack Design** — The frontend lives on Vercel's edge network, the WebSocket server runs as an always-on process on Railway, and Supabase provides managed PostgreSQL. They communicate via a clean `/broadcast` HTTP bridge.
+> **Split-Stack Design** — The frontend lives on Vercel's edge network, the WebSocket server runs as an always-on process on Render, and Supabase provides managed PostgreSQL. They communicate via a clean `/broadcast` HTTP bridge.
 
 ```mermaid
 graph LR
@@ -101,7 +101,7 @@ graph LR
         B["Next.js 16 API Routes<br/>/api/polls/create<br/>/api/polls/[slug]<br/>/api/polls/[slug]/vote"]
     end
 
-    subgraph Railway ["🚂 Railway (Always-On)"]
+    subgraph Render ["🎨 Render (Always-On)"]
         C["Node.js + Express<br/>Socket.io Server<br/>POST /broadcast<br/>GET /health"]
     end
 
@@ -117,7 +117,7 @@ graph LR
 
     style Client fill:#0a0a0a,stroke:#10b981,color:#f5f5f5
     style Vercel fill:#0a0a0a,stroke:#f5f5f5,color:#f5f5f5
-    style Railway fill:#0a0a0a,stroke:#fbbf24,color:#f5f5f5
+    style Render fill:#0a0a0a,stroke:#46e3b7,color:#f5f5f5
     style Supabase fill:#0a0a0a,stroke:#3fcf8e,color:#f5f5f5
 ```
 
@@ -127,15 +127,15 @@ graph LR
 |------|-------------|-------|
 | **1** | User clicks an option → Optimistic UI update (bar moves instantly) | Client |
 | **2** | `POST /api/polls/[slug]/vote` — validates poll, checks fingerprint, checks IP | Vercel |
-| **3** | `INSERT INTO votes` + `RPC increment_vote_count` (atomic) → `POST /broadcast` | Vercel → Railway |
-| **4** | Socket.io emits `vote_update` to all clients in `poll:{id}` room | Railway → All Clients |
+| **3** | `INSERT INTO votes` + `RPC increment_vote_count` (atomic) → `POST /broadcast` | Vercel → Render |
+| **4** | Socket.io emits `vote_update` to all clients in `poll:{id}` room | Render → All Clients |
 
 ---
 
 ## ✨ 11/10 Features
 
 ### ⚡ The "Pulse" Engine
-Custom Socket.io server **separated from Next.js** for true stateful WebSocket connections. Vercel's serverless functions are stateless — they can't hold open sockets. Our dedicated Node.js process on Railway manages persistent room-based pub/sub, handles reconnections, and exposes a `/health` endpoint for uptime monitoring.
+Custom Socket.io server **separated from Next.js** for true stateful WebSocket connections. Vercel's serverless functions are stateless — they can't hold open sockets. Our dedicated Node.js process on Render manages persistent room-based pub/sub, handles reconnections, and exposes a `/health` endpoint for uptime monitoring.
 
 ### 🛡️ The Fortress (Anti-Abuse)
 **Dual-layer protection** that creates serious friction for manipulation:
@@ -224,7 +224,7 @@ Even if the app logic has a bug, Postgres triggers are the last line of defense:
 | **Icons** | Lucide React | Consistent iconography |
 | **Engagement** | canvas-confetti · use-sound · react-qr-code | Confetti, haptic sounds, QR sharing |
 | **Scheduling** | react-datepicker | Custom deadline calendar |
-| **Deployment** | Vercel (app) + Railway (socket) + Supabase (db) | Split-stack, independently scalable |
+| **Deployment** | Vercel (app) + Render (socket) + Supabase (db) | Split-stack, independently scalable |
 
 ---
 
