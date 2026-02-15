@@ -43,40 +43,46 @@
 <table width="100%">
   <tr>
     <td width="50%" align="center">
-      <img src="./screenshots/home.png" alt="Home — Create a Poll" width="100%"/>
+      <img src="./poll-rooms/screenshots/home-hero.png" alt="Home — Create a Poll" width="100%"/>
       <br/>
       <sub><strong>🏠 Home — Create a Poll</strong></sub>
       <br/>
-      <sub>Glassmorphism form, dynamic option inputs, smart scheduling presets, blind-vote toggle — all on a cyber-organic grid background.</sub>
+      <sub>Glassmorphism form on a cyber-organic grid. Dynamic option inputs, smart scheduling presets, and a pulsing "LIVE VOTING" beacon.</sub>
     </td>
     <td width="50%" align="center">
-      <img src="./screenshots/poll-live.png" alt="Poll — Live Voting" width="100%"/>
+      <img src="./poll-rooms/screenshots/live-voting.jpg" alt="Live Voting — Blind Mode" width="100%"/>
       <br/>
-      <sub><strong>⚡ Poll — Live Voting</strong></sub>
+      <sub><strong>⚡ Live Voting — Blind Mode</strong></sub>
       <br/>
-      <sub>Emerald gradient vote bars with animated stripes, real-time count updates via WebSocket, optimistic UI on every click.</sub>
+      <sub>Multi-select checkboxes with emerald accents, "Vote to reveal results" blind badge, live countdown timer, and QR + Share buttons.</sub>
     </td>
   </tr>
   <tr>
     <td width="50%" align="center">
-      <img src="./screenshots/settings.png" alt="Settings — Calendar & Blind Toggle" width="100%"/>
+      <img src="./poll-rooms/screenshots/create-poll.png" alt="Settings — Calendar & Toggles" width="100%"/>
       <br/>
-      <sub><strong>📅 Settings — Calendar & Blind Toggle</strong></sub>
+      <sub><strong>📅 Settings — Calendar & Toggles</strong></sub>
       <br/>
-      <sub>Dark-themed <code>react-datepicker</code> with emerald accents, duration presets, multi-select & results-hidden toggles.</sub>
+      <sub>1-Hour duration preset, Multiple Choice toggle ON, Blind Voting toggle ON — all powered by <code>react-datepicker</code> with dark emerald theming.</sub>
     </td>
     <td width="50%" align="center">
-      <img src="./screenshots/winner.png" alt="Golden Winner — Confetti" width="100%"/>
+      <img src="./poll-rooms/screenshots/winner-confetti.png" alt="Golden Winner — Confetti" width="100%"/>
       <br/>
       <sub><strong>🏆 Golden Winner — Confetti</strong></sub>
       <br/>
-      <sub>When the poll expires, the winning option erupts with <code>canvas-confetti</code>, gold gradient bar, trophy icon & glow effect.</sub>
+      <sub>Poll expires → emerald gradient bars reveal results → <code>canvas-confetti</code> erupts → toast confirms "Vote recorded! Results update live."</sub>
     </td>
   </tr>
 </table>
 
+<br/>
+
 <p align="center">
-  <sub><em>⬆️ Drop your screenshots into <code>./screenshots/</code> — filenames: <code>home.png</code>, <code>poll-live.png</code>, <code>settings.png</code>, <code>winner.png</code></em></sub>
+  <img src="./poll-rooms/screenshots/qr-code.png" alt="QR Code — Scan to Join" width="360"/>
+  <br/>
+  <sub><strong>📱 QR Code Modal — "Scan to Join"</strong></sub>
+  <br/>
+  <sub>One-tap QR generation for instant mobile participation. Point your camera → join the poll.</sub>
 </p>
 
 ---
