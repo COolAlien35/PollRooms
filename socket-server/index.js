@@ -9,10 +9,16 @@ require('dotenv').config();
 const app = express();
 const server = http.createServer(app);
 
+// Configure allowed origins (production + local dev)
+const allowedOrigins = [
+    process.env.FRONTEND_URL,
+    'http://localhost:3000',
+].filter(Boolean);
+
 // Configure Socket.io with CORS
 const io = new Server(server, {
     cors: {
-        origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+        origin: allowedOrigins,
         methods: ['GET', 'POST'],
         credentials: true,
     },
@@ -21,7 +27,7 @@ const io = new Server(server, {
 
 // Middleware
 app.use(cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    origin: allowedOrigins,
 }));
 app.use(express.json());
 
