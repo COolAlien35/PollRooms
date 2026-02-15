@@ -66,11 +66,11 @@
       <sub>Dark-themed <code>react-datepicker</code> with emerald accents — full calendar + scrollable time slots. "Custom Date…" mode with Multi-Select & Blind Voting toggles.</sub>
     </td>
     <td width="50%" align="center">
-      <img src="./screenshots/winner-confetti.png" alt="Golden Winner — Confetti" width="100%"/>
+      <img src="./screenshots/golden-winner.png" alt="Gold Mode — Victory State" width="100%"/>
       <br/>
-      <sub><strong>🏆 Golden Winner — Confetti</strong></sub>
+      <sub><strong>🏆 Gold Mode — Victory State</strong></sub>
       <br/>
-      <sub>Poll expires → emerald gradient bars reveal results → <code>canvas-confetti</code> erupts → toast confirms "Vote recorded! Results update live."</sub>
+      <sub>When the clock hits zero, the winner gets the royal treatment: Golden glowing border, trophy icons, confetti burst, and a "Winner" banner.</sub>
     </td>
   </tr>
 </table>
