@@ -1,0 +1,185 @@
+@import "tailwindcss";
+
+/* ── Tailwind v4: class-based dark mode ── */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ───────────────────────────────────────────── */
+/* ── The Grid & Emerald Design System ──────── */
+/* ───────────────────────────────────────────── */
+
+:root {
+  --background: #0a0a0a;
+  --foreground: #f5f5f5;
+  --accent: #10b981;
+  --accent-hover: #059669;
+  --surface: rgba(23, 23, 23, 0.6);
+  --border: rgba(255, 255, 255, 0.08);
+  --muted: #737373;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-surface: var(--surface);
+  --color-border: var(--border);
+  --color-muted: var(--muted);
+  --font-sans: var(--font-inter);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+/* ───────────────────────────────────────────── */
+/* ── Grid Background Pattern ──────────────── */
+/* ───────────────────────────────────────────── */
+.grid-bg {
+  background-image:
+    linear-gradient(to right, rgba(128, 128, 128, 0.07) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(128, 128, 128, 0.07) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* Radial vignette mask that fades the grid at edges */
+.grid-mask {
+  mask-image: radial-gradient(ellipse 80% 70% at 50% 40%, black 40%, transparent 100%);
+  -webkit-mask-image: radial-gradient(ellipse 80% 70% at 50% 40%, black 40%, transparent 100%);
+}
+
+/* ───────────────────────────────────────────── */
+/* ── Glass Container ──────────────────────── */
+/* ───────────────────────────────────────────── */
+.glass-panel {
+  background: rgba(23, 23, 23, 0.5);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1rem;
+  transition: border-color 0.3s ease;
+}
+
+.glass-panel:hover {
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.glass-panel-strong {
+  background: rgba(23, 23, 23, 0.7);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 1rem;
+}
+
+/* ───────────────────────────────────────────── */
+/* ── Emerald Vote Bar ─────────────────────── */
+/* ───────────────────────────────────────────── */
+.vote-bar-track {
+  background: rgba(16, 185, 129, 0.08);
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.vote-bar-fill {
+  background: linear-gradient(90deg, #10b981, #34d399);
+  border-radius: 0.5rem;
+  transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+  position: relative;
+}
+
+.vote-bar-fill-winner {
+  background: linear-gradient(90deg, #10b981, #34d399, #6ee7b7);
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.35),
+    0 0 24px rgba(16, 185, 129, 0.12);
+}
+
+/* Animated stripes overlay on the fill bar */
+.vote-bar-stripes::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(-45deg,
+      transparent,
+      transparent 6px,
+      rgba(255, 255, 255, 0.08) 6px,
+      rgba(255, 255, 255, 0.08) 12px);
+  animation: stripe-slide 1.5s linear infinite;
+  border-radius: 0.5rem;
+}
+
+@keyframes stripe-slide {
+  0% {
+    background-position-x: 0;
+  }
+
+  100% {
+    background-position-x: 24px;
+  }
+}
+
+/* ───────────────────────────────────────────── */
+/* ── Dark Input ───────────────────────────── */
+/* ───────────────────────────────────────────── */
+.grid-input {
+  background: #0a0a0a;
+  border: 1px solid #262626;
+  border-radius: 0.75rem;
+  color: #f5f5f5;
+  transition: all 0.2s ease;
+}
+
+.grid-input::placeholder {
+  color: rgba(163, 163, 163, 0.5);
+}
+
+.grid-input:focus {
+  outline: none;
+  border-color: #10b981;
+  box-shadow: 0 0 0 1px #10b981,
+    0 0 12px rgba(16, 185, 129, 0.15);
+}
+
+/* ───────────────────────────────────────────── */
+/* ── Utility Animations ───────────────────── */
+/* ───────────────────────────────────────────── */
+@keyframes pulse-glow {
+
+  0%,
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 4px rgba(16, 185, 129, 0.6);
+  }
+
+  50% {
+    opacity: 0.6;
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.9);
+  }
+}
+
+.pulse-live {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+@keyframes pop-in {
+  0% {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-pop-in {
+  animation: pop-in 0.3s ease-out;
+}
+
+/* Winner card glow */
+.winner-glow {
+  border-color: rgba(16, 185, 129, 0.4) !important;
+  box-shadow: 0 0 20px rgba(16, 185, 129, 0.08);
+}
